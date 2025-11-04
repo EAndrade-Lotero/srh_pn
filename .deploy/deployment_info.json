@@ -1,0 +1,13 @@
+{
+    "redeploying_from_archive": false,
+    "mode": "debug",
+    "is_local_deployment": true,
+    "is_ssh_deployment": false,
+    "folder_name": "srh_pn",
+    "secret": {
+        "py/object": "uuid.UUID",
+        "hex": "4ac88ee61c994a539bab2a70aa5550d6"
+    },
+    "deployment_id": "social-roles-and-hierarchies-skeleton-experiment__mode=debug__launch=2025-11-03--20-37-45",
+    "locale": "en"
+}
