@@ -5,8 +5,10 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from numpy.typing import NDArray
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
-from typing import List, Tuple, Optional, Iterable, Union
+from typing import List, Tuple, Optional, Iterable, Union, Any
 
+import psynet.experiment
+from .game_parameters import NUM_FORAGERS
 
 
 class SliderValues:
@@ -49,6 +51,19 @@ class SliderValues:
         print_out += f"\nWages commission: {self.wages_commission:.2f}"
         print_out += f"\nOverhead: {self.overhead:.2f}"
         return print_out
+
+    @staticmethod
+    def dimension_explanation(dimension:str) -> str:
+        assert(dimension in ["overhead", "wages-commission", "prerogative"]), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages-commission' or 'prerogative'"
+        if dimension == "overhead":
+            explanation = "Overhead"
+        elif dimension == "wages-commission":
+            explanation = "Wages commission"
+        elif dimension == "prerogative":
+            explanation = "Prerogative"
+        else:
+            raise ValueError(f"Invalid dimension: {dimension}. Expected 'overhead', 'wages-commission' or 'prerogative'")
+        return explanation
 
 
 class World:
@@ -246,4 +261,59 @@ class World:
         )
 
         return [tuple(row) for row in samples]
+
+
+class WealthTracker:
+    """Keeps track of the coins throughout iterations"""
+
+    def __init__(self) -> None:
+        self.n_coins: int = 0
+        self.num_foragers: int = NUM_FORAGERS
+        self.coordinator_wealth: Union[float, None] = None
+        self.foragers_wealth: Union[List[float], None] = None
+
+    def update(self, trials: List[Any], slider: SliderValues) -> None:
+        assert len(trials) == self.num_foragers
+        pass
+
+    def initialize(self, slider: SliderValues) -> None:
+        self.coordinator_wealth = 0
+        self.foragers_wealth = [0] * self.num_foragers
+
+    def get_coordinator_wealth(self) -> float:
+        assert(self.coordinator_wealth is not None), "Coordinator wealth is not set yet. Run update() first."
+        return self.coordinator_wealth
+
+    def get_forager_wealth(self, forager_id: int) -> float:
+        assert(self.foragers_wealth is not None), "Forager wealth is not set yet. Run update() first."
+        return self.foragers_wealth[forager_id]
+
+
+class RewardProcessing:
+    """Processes rewards and gives feedback"""
+
+    @staticmethod
+    def get_reward_text(
+        experiment: psynet.experiment.Experiment,
+        trial_type: str
+    ) -> str:
+        trial_types = ["coordinator"] + [f"forager-{i+1}" for i in range(NUM_FORAGERS)]
+        assert(trial_type in trial_types), f"Invalid trial type: {trial_type}. Expected one of {trial_types}."
+
+        wealth_tracker = experiment.var.accumulated_wealth
+        n_coins = wealth_tracker.n_coins
+
+        if trial_type == "coordinator":
+            wealth = wealth_tracker.get_coordinator_wealth()
+        elif trial_type.startswith("forager"):
+            forager_id = trial_type.split("-")[1]
+            wealth = wealth_tracker.get_forager_wealth(forager_id)
+        else:
+            raise ValueError(f"Invalid trial type: {trial_type}. Expected one of {trial_types}.")
+
+        reward_text = f"The total number of coins collected on the previous iteration is {n_coins}."
+        reward_text += f"Based on the existing contract, you received {wealth} coins."
+        reward_text += f"Bear in mind that your performance in this turn will influence the rewards"
+        reward_text += f"of future iterations, including your own."
+        return reward_text
 

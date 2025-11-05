@@ -12,7 +12,10 @@ from psynet.trial.imitation_chain import ImitationChainTrialMaker
 from .coordinator_classes import CoordinatorTrial
 from .forager_classes import ForagerTrial
 from .custom_node import CustomNode
-from .helper_classes import SliderValues
+from .helper_classes import (
+    SliderValues,
+    WealthTracker,
+)
 from .game_parameters import (
     NUM_FORAGERS,
     MAX_NODES_PER_CHAIN,
@@ -26,8 +29,10 @@ from .game_parameters import (
 # logger
 logger = get_logger()
 
-# Classes for keep record of slider values
+# Classes for keep record of slider values and wealth
 slider = SliderValues()
+accumulated_wealth = WealthTracker()
+accumulated_wealth.initialize(slider)
 
 # Create list of initial nodes
 start_nodes = [
@@ -78,6 +83,7 @@ class Exp(psynet.experiment.Experiment):
 
     variables = {
         "slider": slider,
+        "accumulated_wealth": accumulated_wealth,
     }
 
     timeline = Timeline(
