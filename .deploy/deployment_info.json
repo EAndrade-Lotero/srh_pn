@@ -6,8 +6,8 @@
     "folder_name": "srh_pn",
     "secret": {
         "py/object": "uuid.UUID",
-        "hex": "7c4772aed9e44f53aaa95e26c71e1cc3"
+        "hex": "fef1d478bbaf4f518c2bf02f4f01404f"
     },
-    "deployment_id": "social-roles-and-hierarchies-skeleton-experiment__mode=debug__launch=2025-11-04--19-56-14",
+    "deployment_id": "social-roles-and-hierarchies-skeleton-experiment__mode=debug__launch=2025-11-11--13-54-53",
     "locale": "en"
 }

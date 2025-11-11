@@ -6,16 +6,16 @@
 from pathlib import Path
 from typing import Any, Union, List
 
+from psynet.page import  InfoPage
+from psynet.utils import get_logger
 from psynet.modular_page import (
     ModularPage,
     Prompt,
     SliderControl,
 )
-from psynet.trial.imitation_chain import ImitationChainTrial
-from psynet.trial.create_and_rate import CreateTrialMixin
 from psynet.timeline import FailedValidation
-from psynet.utils import get_logger
-from psynet.page import  InfoPage
+from psynet.trial.create_and_rate import CreateTrialMixin
+from psynet.trial.imitation_chain import ImitationChainTrial
 
 from .custom_front_end import (
     HelloPrompt,
@@ -24,14 +24,16 @@ from .custom_front_end import (
 from .game_parameters import (
     NUM_FORAGERS,
     NUM_COINS,
-    DISTRIBUTION,
     DISPERSION,
     IMAGE_PATHS,
 )
 from .helper_classes import (
     World,
     RewardProcessing,
-    SliderValues,
+)
+from .custom_pages import (
+    WellBeingReportPage,
+    SliderSettingPage,
 )
 
 logger = get_logger()
@@ -43,6 +45,7 @@ logger = get_logger()
 class InvestingPage(ModularPage):
     def __init__(
             self,
+            distribution: str,
             time_estimate: float,
     ) -> None:
 
@@ -64,6 +67,7 @@ class InvestingPage(ModularPage):
             ),
             time_estimate=time_estimate,
         )
+        self.distribution = distribution
 
     def format_answer(self, raw_answer, **kwargs) -> str:
         try:
@@ -79,7 +83,7 @@ class InvestingPage(ModularPage):
             world = World(
                 num_coins=NUM_COINS,
                 num_centroids=NUM_FORAGERS,
-                distribution=DISTRIBUTION,
+                distribution=self.distribution,
                 dispersion=DISPERSION,
             )
             world.map_path = Path(IMAGE_PATHS["map_url"])
@@ -92,7 +96,8 @@ class InvestingPage(ModularPage):
 
             return "OK"
 
-        except (ValueError, AssertionError):
+        except (ValueError, AssertionError) as e:
+            logger.info(f"Oooops: {e}")
             return f"INVALID_RESPONSE"
 
     def validate(self, response, **kwargs) -> Union[FailedValidation, None]:
@@ -102,106 +107,6 @@ class InvestingPage(ModularPage):
             return FailedValidation(f"This failed for some reason.")
         logger.info(f"Validated!")
         return None
-
-
-class WellBeingReportPage(ModularPage):
-    def __init__(
-            self,
-            time_estimate: float,
-    ) -> None:
-
-        information_text = '''
-        Please move the slider below to match your level of satisfaction with the result
-        '''
-        super().__init__(
-            "Coordinator_well-being_report",
-            Prompt(
-                text=information_text,
-            ),
-            SliderControl(
-                start_value=0.5,
-                min_value=0,
-                max_value=1,
-                n_steps=100,
-            ),
-            time_estimate=time_estimate,
-        )
-
-    def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
-        try:
-            coordinator_well_being = float(raw_answer)
-            logger.info(f"------> The coordinator reports a {coordinator_well_being*100}% well-being")
-            return coordinator_well_being
-
-        except (ValueError, AssertionError):
-            return f"INVALID_RESPONSE"
-
-    def validate(self, response, **kwargs) -> Union[FailedValidation, None]:
-        logger.info(f"Validating...")
-        if response.answer == "INVALID_RESPONSE":
-            logger.info(f"Invalid response!")
-            return FailedValidation(f"This failed for some reason.")
-        logger.info(f"Validated!")
-        return None
-
-
-class SliderSettingPage(ModularPage):
-    def __init__(
-            self,
-            dimension: str,
-            slider: SliderValues,
-            time_estimate: float,
-    ) -> None:
-        assert(dimension in ["overhead", "wages-commission", "prerogative"]), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages-commission' or 'prerogative'"
-
-        information_text = f'''
-        You can modify the parameters of the social contract established so far.
-        This is the place to modify the {dimension} parameter.
-        {SliderValues.dimension_explanation(dimension)}.
-        Please move the slider below to match the new level of {dimension}.
-        '''
-        self.dimension = dimension
-
-        if dimension == "overhead":
-            start_value = slider.overhead
-        elif dimension == "wages-commission":
-            start_value = slider.wages_commission
-        elif dimension == "prerogative":
-            start_value = slider.coordinator_prerogative
-        else:
-            raise ValueError(f"Invalid dimension: {dimension}. Expected 'overhead', 'wages-commission', 'prerogative'.")
-
-        super().__init__(
-            "parameter_modification",
-            Prompt(
-                text=information_text,
-            ),
-            SliderControl(
-                start_value=start_value,
-                min_value=0,
-                max_value=1,
-                n_steps=100,
-            ),
-            time_estimate=time_estimate,
-        )
-
-    def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
-        try:
-            new_value = float(raw_answer)
-            logger.info(f"------> The coordinator sets {self.dimension} to {new_value}%.")
-            return new_value
-
-        except (ValueError, AssertionError):
-            return f"INVALID_RESPONSE"
-
-    def validate(self, response, **kwargs) -> Union[FailedValidation, None]:
-        logger.info(f"Validating...")
-        if response.answer == "INVALID_RESPONSE":
-            logger.info(f"Invalid response!")
-            return FailedValidation(f"This failed for some reason.")
-        logger.info(f"Validated!")
-        return None
-
 
 
 class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
@@ -213,23 +118,19 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
         # pydevd_pycharm.settrace('localhost', port=12345, stdout_to_server=True, stderr_to_server=True)
 
         logger.info("Entering the coordinator trial...")
+        distribution = participant.current_trial.node.get_seed()
+        logger.info(f"{distribution} is the seed.")
 
         slider = experiment.var.slider
-        logger.info(f"===>{slider}")
+        logger.info(f"Sliders values:\n{slider}")
 
         list_of_pages = [
             InfoPage(
                 "This is going to be the Instructions page for the COORDINATOR",
                 time_estimate=5
             ),
-            InfoPage(
-                RewardProcessing.get_reward_text(experiment, "coordinator"),
-                time_estimate=5
-            ),
-            WellBeingReportPage(
-                time_estimate=self.time_estimate,
-            ),
             InvestingPage(
+                distribution=distribution,
                 time_estimate=self.time_estimate,
             ),
             ModularPage(
@@ -245,11 +146,18 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 ),
                 time_estimate=self.time_estimate
             ),
+            InfoPage(
+                RewardProcessing.get_reward_text(experiment, "coordinator"),
+                time_estimate=5
+            ),
+            WellBeingReportPage(
+                time_estimate=self.time_estimate,
+            ),
             SliderSettingPage(
                 dimension="overhead",
-                slider=slider,
+                experiment=experiment,
                 time_estimate=self.time_estimate,
-            )
+            ),
         ]
         return list_of_pages
 

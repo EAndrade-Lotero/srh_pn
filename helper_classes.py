@@ -8,6 +8,10 @@ from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from typing import List, Tuple, Optional, Iterable, Union, Any
 
 import psynet.experiment
+from psynet.utils import get_logger
+
+logger = get_logger()
+
 from .game_parameters import NUM_FORAGERS
 
 
@@ -274,11 +278,43 @@ class WealthTracker:
 
     def update(self, trials: List[Any], slider: SliderValues) -> None:
         assert len(trials) == self.num_foragers
-        pass
+
+        # Get forager production in previous episode
+        foragers_payoffs = self.get_coins_from_foragers(trials)
+        self.n_coins = sum(foragers_payoffs)
+        foragers_proportions = np.array(foragers_payoffs) / self.n_coins
+
+        # Get slider parameters
+        overhead = slider.get_overhead()
+        wages = slider.get_wages_commission()
+
+        # Calculate coordinator's wealth
+        self.coordinator_wealth = overhead * self.n_coins
+        remaining = self.n_coins - self.coordinator_wealth
+
+        # Calculate foragers' wealth
+        wages = remaining * wages
+        remaining = remaining - wages
+        foragers_split = foragers_proportions * remaining
+        self.foragers_wealth = foragers_split + wages
+
+    def get_coins_from_foragers(self, trials: List[Any]) -> NDArray[np.float64]:
+        for trial in trials:
+            if 'Forager' in type(trial):
+                answers = self.get_target_answer(trial)
+                logger.info(f"{str(trial)} => {answers}")
 
     def initialize(self, slider: SliderValues) -> None:
-        self.coordinator_wealth = 0
-        self.foragers_wealth = [0] * self.num_foragers
+        # Get slider parameters
+        overhead = slider.get_overhead()
+        wages = slider.get_wages_commission()
+
+        # Calculate coordinator's wealth
+        self.coordinator_wealth = overhead * self.n_coins
+        remaining = self.n_coins - self.coordinator_wealth
+
+        # Calculate foragers' wealth
+        self.foragers_wealth = [remaining / self.num_foragers] * self.num_foragers
 
     def get_coordinator_wealth(self) -> float:
         assert(self.coordinator_wealth is not None), "Coordinator wealth is not set yet. Run update() first."
@@ -300,20 +336,19 @@ class RewardProcessing:
         trial_types = ["coordinator"] + [f"forager-{i+1}" for i in range(NUM_FORAGERS)]
         assert(trial_type in trial_types), f"Invalid trial type: {trial_type}. Expected one of {trial_types}."
 
-        wealth_tracker = experiment.var.accumulated_wealth
-        n_coins = wealth_tracker.n_coins
+        accumulated_wealth = experiment.var.accumulated_wealth
+        n_coins = accumulated_wealth.n_coins
 
         if trial_type == "coordinator":
-            wealth = wealth_tracker.get_coordinator_wealth()
+            wealth = accumulated_wealth.get_coordinator_wealth()
         elif trial_type.startswith("forager"):
             forager_id = trial_type.split("-")[1]
-            wealth = wealth_tracker.get_forager_wealth(forager_id)
+            forager_id = int(forager_id)
+            wealth = accumulated_wealth.get_forager_wealth(forager_id)
         else:
             raise ValueError(f"Invalid trial type: {trial_type}. Expected one of {trial_types}.")
 
-        reward_text = f"The total number of coins collected on the previous iteration is {n_coins}."
-        reward_text += f"Based on the existing contract, you received {wealth} coins."
-        reward_text += f"Bear in mind that your performance in this turn will influence the rewards"
-        reward_text += f"of future iterations, including your own."
+        reward_text = f"The total number of coins collected on the previous iteration is {n_coins}.\n\n"
+        reward_text += f"Based on the existing contract, you received {wealth} coins.\n\n"
         return reward_text
 

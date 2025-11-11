@@ -19,6 +19,8 @@ from .helper_classes import (
 from .game_parameters import (
     NUM_FORAGERS,
     MAX_NODES_PER_CHAIN,
+    NUM_ITERATIONS_PER_PLAYER,
+    LIST_OF_DISTRIBUTIONS,
     IMAGE_PATHS,
 )
 
@@ -32,14 +34,17 @@ logger = get_logger()
 # Classes for keep record of slider values and wealth
 slider = SliderValues()
 accumulated_wealth = WealthTracker()
+accumulated_wealth.n_coins = 100 # <= For testing purposes
 accumulated_wealth.initialize(slider)
 
 # Create list of initial nodes
+
 start_nodes = [
     CustomNode(
         context=IMAGE_PATHS,
-        seed="initial creation"
+        seed=distribution
     )
+    for distribution in LIST_OF_DISTRIBUTIONS
 ]
 
 ###########################################

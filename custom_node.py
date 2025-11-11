@@ -1,11 +1,13 @@
 # Module with the custom node
-
 ##########################################################################################
 # Imports
 ##########################################################################################
 
 from psynet.trial import ChainNode
 from psynet.trial.create_and_rate import CreateAndRateNodeMixin
+from psynet.utils import get_logger
+
+logger = get_logger()
 
 ###########################################
 # Custom node
@@ -15,6 +17,9 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def get_seed(self) -> str:
+        return self.seed
 
     def create_definition_from_seed(self, seed, experiment, participant):
         return seed
@@ -38,10 +43,8 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
         # logger.info(f"trials: {trials_by_type}")
         # logger.info("")
 
-        working_slider = experiment.var.slider
-        working_slider.update_overhead(1)
-        experiment.var.set("slider", working_slider)
+        slider = experiment.var.slider
+        accumulated_wealth = experiment.var.accumulated_wealth
+        accumulated_wealth.update(trials, slider)
+        experiment.var.set("accumulated_wealth", accumulated_wealth)
 
-        #implement!!!
-        # take debugger here, and write a list comprehension that gets the right data from the trials
-        # note that trials maybe of different types so maybe you need to check the type before accessing the data to avoid error

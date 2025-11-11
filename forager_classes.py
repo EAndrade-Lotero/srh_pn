@@ -6,30 +6,33 @@
 
 import numpy as np
 
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Union
 
+from psynet.page import  InfoPage
+from psynet.utils import get_logger
 from psynet.modular_page import (
     ModularPage,
     Prompt,
     PushButtonControl,
-    SliderControl,
 )
 from psynet.trial.create_and_rate import (
     CreateAndRateNode,
     SelectTrialMixin,
 )
 from psynet.trial.imitation_chain import ImitationChainTrial
-from psynet.utils import get_logger
 
-from .helper_functions import get_list_participants_ids
-from .coordinator_classes import CoordinatorTrial
 from .game_parameters import NUM_FORAGERS
+from .helper_classes import RewardProcessing
+from .custom_pages import WellBeingReportPage
+from .coordinator_classes import CoordinatorTrial
+from .helper_functions import get_list_participants_ids
 
 logger = get_logger()
 
 ###########################################
 # Forager classes
 ###########################################
+
 
 class ForagerTrial(SelectTrialMixin, ImitationChainTrial):
     time_estimate = 5
@@ -49,6 +52,7 @@ class ForagerTrial(SelectTrialMixin, ImitationChainTrial):
         participants_ids = get_list_participants_ids(experiment, participant)
         # Calculate id based on number of previous non-failed participants
         forager_id = (len(participants_ids) % (NUM_FORAGERS + 1)) - 1
+        forager_id = int(forager_id)
         logger.info(f"forager id: {forager_id}")
         # Extract forager position
         location = positions[str(forager_id)]
@@ -59,22 +63,9 @@ class ForagerTrial(SelectTrialMixin, ImitationChainTrial):
         logger.info(f"rated_target_strs: {rated_target_strs}")
 
         list_of_pages = [
-            # InfoPage(
-            #     "This is going to be the Instructions page for a FORAGER",
-            #     time_estimate=5
-            # ),
-            ModularPage(
-                "forager_wages_parameter_modification",
-                Prompt(
-                    text=f"Move the slider to set a new value for the wages parameter:",
-                ),
-                SliderControl(
-                    start_value=wages_parameter,
-                    min_value=max(wages_parameter - 0.2, 0),
-                    max_value=min(wages_parameter + 0.2, 1),
-                    n_steps=10000,
-                ),
-                time_estimate=self.time_estimate
+            InfoPage(
+                "This is going to be the Instructions page for a FORAGER",
+                time_estimate=5
             ),
             ModularPage(
                 "forager_turn",
@@ -87,6 +78,13 @@ class ForagerTrial(SelectTrialMixin, ImitationChainTrial):
                     arrange_vertically=False,
                 ),
                 time_estimate=self.time_estimate
+            ),
+            InfoPage(
+                RewardProcessing.get_reward_text(experiment, f"forager-{forager_id}"),
+                time_estimate=5
+            ),
+            WellBeingReportPage(
+                time_estimate=self.time_estimate,
             ),
         ]
         return list_of_pages
