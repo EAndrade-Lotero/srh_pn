@@ -39,7 +39,7 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
 
         # Update wealth using results from players
         accumulated_wealth = WealthTracker()
-        accumulated_wealth.update(trials, sliders)
+        accumulated_wealth.update_from_trials(trials, sliders)
 
         # Update records
         self.seed['overhead'] = sliders.get_overhead()

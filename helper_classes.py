@@ -321,7 +321,7 @@ class WealthTracker:
         self.coordinator_wealth: Union[float, None] = None
         self.foragers_wealth: Union[List[float], None] = None
 
-    def update(self, trials: List[Any], slider: SliderValues) -> None:
+    def update_from_trials(self, trials: List[Any], slider: SliderValues) -> None:
         assert len(trials) == self.num_foragers
 
         # Get forager production in previous episode
