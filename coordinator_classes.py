@@ -16,7 +16,8 @@ from psynet.modular_page import (
 )
 from psynet.timeline import (
     PageMaker,
-    FailedValidation
+    CodeBlock,
+    FailedValidation,
 )
 from psynet.trial.create_and_rate import CreateTrialMixin
 from psynet.trial.imitation_chain import ImitationChainTrial
@@ -24,9 +25,6 @@ from psynet.trial.imitation_chain import ImitationChainTrial
 from .custom_front_end import (
     HelloPrompt,
     PositioningControl,
-)
-from .game_parameters import (
-    NUM_FORAGERS,
 )
 from .helper_classes import (
     World,
@@ -107,6 +105,7 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
             world.forager_path = Path(self.context["forager_url"])
             # Extract slider values
             overhead = self.origin.definition['overhead']
+            logger.info(f"Overhead: {overhead}")
         else:
             raise Exception("Error: No world created for this trial.")
 
@@ -154,7 +153,18 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 start_value=overhead,
                 time_estimate=self.time_estimate,
             ),
+            CodeBlock(
+                lambda participant: self.update_slider("overhead", participant)
+            )
         ]
         return list_of_pages
+
+    def update_slider(self, dimension:str, participant) -> None:
+        assert(dimension in ["overhead", "prerogative", "wages"])
+        logger.info(f"Updating slider for {dimension}...")
+        new_value = participant.vars[dimension]
+        logger.info(f"New value: {new_value}")
+        self.origin.definition[dimension] = new_value
+        logger.info(f"Attempting to update parameter: {self.origin.definition[dimension]}")
 
 ###########################################

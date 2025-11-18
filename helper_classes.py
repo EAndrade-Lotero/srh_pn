@@ -14,6 +14,7 @@ logger = get_logger()
 
 from .game_parameters import (
     NUM_FORAGERS,
+    POWER_ROLE,
     INITIAL_WEALTH,
 )
 
@@ -48,7 +49,8 @@ class SliderValues:
     def update_overhead(self, value: float) -> None:
         self.overhead = value
 
-    def update_from_trials(self, trials: List[Any], role:str) -> None:
+    def update_from_trials(self, trials: List[Any]) -> None:
+        role = POWER_ROLE
         assert(role in ['coordinator'] + [f"forager-{i}" for i in range(NUM_FORAGERS)])
         trial = [t for t in trials if role in type(t)]
         logger.info(f"Updating {trial}")

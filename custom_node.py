@@ -11,12 +11,6 @@ from .helper_classes import (
     SliderValues,
     WealthTracker,
 )
-from .game_parameters import (
-    NUM_FORAGERS,
-    NUM_COINS,
-    POWER_ROLE,
-)
-
 
 logger = get_logger()
 
@@ -35,7 +29,7 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
     def summarize_trials(self, trials: list, experiment, participant) -> None:
         # Update slider values
         sliders = SliderValues()
-        sliders.update_from_trials(trials, POWER_ROLE)
+        sliders.update_from_trials(trials)
 
         # Update wealth using results from players
         accumulated_wealth = WealthTracker()
