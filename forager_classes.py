@@ -41,9 +41,6 @@ class ForagerTrial(SelectTrialMixin, ImitationChainTrial):
     def show_trial(self, experiment, participant) -> List[Any]:
         assert self.trial_maker.target_selection_method == "all"
 
-        # Get wages_parameter from previous generation
-        wages_parameter = experiment.var.slider.get_wages_commission()
-
         # Get list of positions from target
         positions = self.get_positions_from_target()
         logger.info(f"positions: {positions}")
@@ -82,13 +79,13 @@ class ForagerTrial(SelectTrialMixin, ImitationChainTrial):
                 ),
                 time_estimate=self.time_estimate
             ),
-            InfoPage(
-                RewardProcessing.get_reward_text(experiment, f"forager-{forager_id}"),
-                time_estimate=5
-            ),
-            WellBeingReportPage(
-                time_estimate=self.time_estimate,
-            ),
+            # InfoPage(
+            #     RewardProcessing.get_reward_text(experiment, f"forager-{forager_id}"),
+            #     time_estimate=5
+            # ),
+            # WellBeingReportPage(
+            #     time_estimate=self.time_estimate,
+            # ),
         ]
         return list_of_pages
 
