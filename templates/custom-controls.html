@@ -49,7 +49,7 @@
     </head>
 
     <div class="stage" id="stage">
-        <img id="mapImg" class="map" alt="Map" style="width:800px; height:800px;" src={{ config.map_url }}/>
+        <canvas id="mapImg" width="800" height="800"></canvas>
 
           {# Create NUM_FORAGERS icons #}
           {% for i in range(config.num_foragers) %}
@@ -62,14 +62,39 @@
                  ">
             </div>
           {% endfor %}
-
-{#        <div id="forager1-container" class="icon" style="left:20px; top:20px">#}
-{#        </div>#}
-{#        <div id="forager2-container" class="icon" style="left: 120px; top: 20px">#}
-{#        </div>#}
     </div>
 
     <script>
+        /////////////////////////////////////////////////////
+        // Draw the map from pixel data
+        /////////////////////////////////////////////////////
+        const data = {{ config.map }};  // H x W x 3
+        const H = data.length;
+        const W = data[0].length;
+        const canvas = document.getElementById("mapImg");
+        const ctx = canvas.getContext("2d");
+        const imgData = ctx.createImageData(W, H);
+        const buf = imgData.data;
+
+        let idx = 0;
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const [r, g, b, a] = data[y][x];
+            buf[idx++] = r;
+            buf[idx++] = g;
+            buf[idx++] = b;
+            buf[idx++] = 255; // alpha
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        // Scale the 3×3 image up to fill the canvas (300×300)
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(canvas, 0, 0, W, H, 0, 0, canvas.width, canvas.height);
+
+        /////////////////////////////////////////////////////
+        // Functions to drag and drop foragers' icons
+        /////////////////////////////////////////////////////
         const stage = document.getElementById('stage');
         const icons = Array.from(stage.querySelectorAll('.icon'));
 

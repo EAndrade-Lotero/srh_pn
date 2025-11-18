@@ -3,7 +3,6 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
-
 from typing import Union
 from markupsafe import Markup
 
@@ -12,8 +11,10 @@ from psynet.modular_page import (
     ImagePrompt,
     Control,
 )
-
 from psynet.utils import get_logger
+
+from .helper_classes import World
+from .game_parameters import NUM_COINS
 
 logger = get_logger()
 
@@ -53,14 +54,18 @@ class PositioningControl(Control):
 
     def __init__(
         self,
-        map_url:str,
-        forager_url:str,
-        num_foragers:int,
+        world:World,
+        investment:int,
     ) -> None:
         super().__init__()
-        self.map_url = map_url
-        self.forager_url = forager_url
-        self.num_foragers = num_foragers
+        map_numpy = world.render(
+            show=False,
+            coin_percentage=investment,
+            coin_zoom=1 / NUM_COINS
+        )
+        self.map = map_numpy.tolist()
+        self.forager_url = world.forager_path
+        self.num_foragers = world.num_foragers
 
     def format_answer(self, raw_answer, **kwargs):
         logger.info(f"Foragers positions: {raw_answer}")

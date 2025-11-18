@@ -12,17 +12,19 @@ from psynet.trial.imitation_chain import ImitationChainTrialMaker
 from .coordinator_classes import CoordinatorTrial
 from .forager_classes import ForagerTrial
 from .custom_node import CustomNode
-from .helper_classes import (
-    SliderValues,
-    WealthTracker,
-)
 from .game_parameters import (
     NUM_FORAGERS,
-    MAX_NODES_PER_CHAIN,
-    NUM_ITERATIONS_PER_PLAYER,
+    NUM_CENTROIDS,
+    NUM_COINS,
     LIST_OF_DISTRIBUTIONS,
+    DISPERSION,
+    STARTING_OVERHEAD,
+    STARTING_PREROGATIVE,
+    STARTING_WAGES,
+    INITIAL_WEALTH,
     IMAGE_PATHS,
 )
+from .helper_classes import World
 
 ###########################################
 # Variables
@@ -31,18 +33,22 @@ from .game_parameters import (
 # logger
 logger = get_logger()
 
-# Classes for keep record of slider values and wealth
-slider = SliderValues()
-accumulated_wealth = WealthTracker()
-accumulated_wealth.n_coins = 100 # <= For testing purposes
-accumulated_wealth.initialize(slider)
-
 # Create list of initial nodes
-
 start_nodes = [
     CustomNode(
         context=IMAGE_PATHS,
-        seed=distribution
+        seed={
+            'world':World(
+                num_coins=NUM_COINS,
+                num_centroids=NUM_CENTROIDS,
+                distribution=distribution,
+                dispersion=DISPERSION,
+            ),
+            'overhead':STARTING_OVERHEAD,
+            'prerogative':STARTING_PREROGATIVE,
+            'wages':STARTING_WAGES,
+            'wealth':INITIAL_WEALTH
+        }
     )
     for distribution in LIST_OF_DISTRIBUTIONS
 ]
@@ -79,17 +85,12 @@ trial_maker = CreateAndRateTrialMaker(
     recruit_mode="n_trials",
     target_n_participants=None,
     wait_for_networks=False,
-    max_nodes_per_chain=MAX_NODES_PER_CHAIN,
+    max_nodes_per_chain=1,
 )
 
 class Exp(psynet.experiment.Experiment):
     label = "Social roles and hierarchies skeleton experiment"
     initial_recruitment_size = 1
-
-    variables = {
-        "slider": slider,
-        "accumulated_wealth": accumulated_wealth,
-    }
 
     timeline = Timeline(
         trial_maker,

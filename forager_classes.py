@@ -6,6 +6,7 @@
 
 import numpy as np
 
+from markupsafe import Markup
 from typing import List, Tuple, Dict, Any, Union
 
 from psynet.page import  InfoPage
@@ -70,7 +71,9 @@ class ForagerTrial(SelectTrialMixin, ImitationChainTrial):
             ModularPage(
                 "forager_turn",
                 Prompt(
-                    text=f"You have been located here:<br><strong>{location}</strong>",
+                    text=Markup(f"""
+                    <p>You have been located here:</p><br><p>{location}</p>
+                    """)
                 ),
                 PushButtonControl(
                     choices=rated_target_strs[:1],

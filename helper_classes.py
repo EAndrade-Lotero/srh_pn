@@ -12,7 +12,10 @@ from psynet.utils import get_logger
 
 logger = get_logger()
 
-from .game_parameters import NUM_FORAGERS
+from .game_parameters import (
+    NUM_FORAGERS,
+    INITIAL_WEALTH,
+)
 
 
 class SliderValues:
@@ -44,6 +47,27 @@ class SliderValues:
 
     def update_overhead(self, value: float) -> None:
         self.overhead = value
+
+    def update_from_trials(self, trials: List[Any], role:str) -> None:
+        assert(role in ['coordinator'] + [f"forager-{i}" for i in range(NUM_FORAGERS)])
+        trial = [t for t in trials if role in type(t)]
+        logger.info(f"Updating {trial}")
+        assert(len(trial) == 1)
+        trial = trial[0]
+        logger.info(f"{trial.origin.definition}")
+
+        # parameters =  ["overhead", "prerogative", "wages"]
+        parameters =  ["overhead"]
+        for parameter in parameters:
+            new_value = trial.vars[parameter]
+            if parameter == "prerogative":
+                self.update_coordinator_prerogative(new_value)
+            elif parameter == "wages":
+                self.update_wages_commission(new_value)
+            elif parameter == "overhead":
+                self.update_overhead(new_value)
+            else:
+                raise Exception(f"Unknown parameter: {parameter}")
 
     def random_init(self) -> None:
         self.coordinator_prerogative = self.rng.random()
@@ -78,8 +102,12 @@ class World:
     width: Optional[int] = 100
     height: Optional[int] = 100
     seed: Optional[int] = None
-    coin_path: Path = Path('./static/assets/coin.png')
-    map_path: Path = Path('./static/map.png')
+    coin_path: Path = None
+    map_path: Path = None
+    forager_path = None
+    num_foragers: int = NUM_FORAGERS
+    forager_positions: List[Tuple[int, int]] = []
+    forager_queue: List[Tuple[int, Tuple[int, int]]] = []
 
     def __init__(
         self,
@@ -104,7 +132,16 @@ class World:
         self.grid = np.zeros((self.width, self.height))
         self._place_coins()
 
-    def positions(self) -> List[Tuple[int, int]]:
+    def add_forager_position(self, position:Tuple[int, int]) -> None:
+        forager_id = len(self.forager_positions)
+        self.forager_positions.append(position)
+        self.forager_queue.append((forager_id, position))
+
+    def get_forager_position(self) -> Tuple[int, Tuple[int, int]]:
+        forager_id, position = self.forager_queue.pop(0)
+        return forager_id, position
+
+    def coin_positions(self) -> List[Tuple[int, int]]:
         """List of (row, col) positions where coins are present."""
         coords_x, coords_y = np.where(self.grid == 1)
         coin_positions = list(zip(coords_x.tolist(), coords_y.tolist()))
@@ -185,12 +222,13 @@ class World:
         show: bool = False,
         coin_zoom: float = 0.1,
         coin_percentage: Optional[float] = 1,
-    ) -> None:
+    ) -> NDArray[np.uint8]:
         """Render the world by drawing coin images at coin positions.
 
         Args:
-            show: If True, also display the figure.
-            coin_zoom: Relative size of the coin inside a cell (0<zoom<=1).
+            :param coin_zoom: Relative size of the coin inside a cell (0<zoom<=1).
+            :param show: If True, also display the figure.
+            :param coin_percentage: Probability of drawing a coin.
         """
         if not (0 < coin_zoom <= 1.0):
             raise ValueError("coin_zoom must be in (0, 1].")
@@ -198,7 +236,7 @@ class World:
         # Canvas sized roughly to grid, independent of DPI
         fig, ax = plt.subplots(
             figsize=(self.width / 10, self.height / 10),
-            dpi=300
+            dpi=100
         )
 
         # Light cell grid
@@ -216,7 +254,7 @@ class World:
 
         # Place the coin image centered in each occupied cell
         half = 0.5 * coin_zoom
-        coins = self.positions()
+        coins = self.coin_positions()
         for (r, c) in coins:
             if self._rng.random() < coin_percentage:
                 coin_img.image.axes = ax
@@ -227,10 +265,17 @@ class World:
                 )
                 ax.add_artist(ab)
 
-        fig.savefig(self.map_path, dpi=300, bbox_inches="tight")
+        # Render the figure to a buffer
+        fig.canvas.draw()
+        # Convert to a NumPy array (RGBA)
+        img = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        img = img.reshape(fig.canvas.get_width_height()[::-1] + (4,))  # (H, W, 4)
+
         if show:
             plt.show()
         plt.close(fig)
+
+        return img
 
     def sample_bivariate_normal(
         self,
@@ -271,7 +316,7 @@ class WealthTracker:
     """Keeps track of the coins throughout iterations"""
 
     def __init__(self) -> None:
-        self.n_coins: int = 0
+        self.n_coins: int = INITIAL_WEALTH
         self.num_foragers: int = NUM_FORAGERS
         self.coordinator_wealth: Union[float, None] = None
         self.foragers_wealth: Union[List[float], None] = None
@@ -301,20 +346,24 @@ class WealthTracker:
     def get_coins_from_foragers(self, trials: List[Any]) -> NDArray[np.float64]:
         for trial in trials:
             if 'Forager' in type(trial):
-                answers = self.get_target_answer(trial)
+                answers = self.get_coins(trial)
                 logger.info(f"{str(trial)} => {answers}")
+
+    def get_coins(self, trial: Any) -> int:
+        logger.info(f"{hasattr(trial, "vars['coins_foraged']")}")
+        return 10
 
     def initialize(self, slider: SliderValues) -> None:
         # Get slider parameters
         overhead = slider.get_overhead()
-        wages = slider.get_wages_commission()
+        wages = slider.get_wages_commission() # <= MUST USE BELOW
 
         # Calculate coordinator's wealth
         self.coordinator_wealth = overhead * self.n_coins
         remaining = self.n_coins - self.coordinator_wealth
 
         # Calculate foragers' wealth
-        self.foragers_wealth = [remaining / self.num_foragers] * self.num_foragers
+        self.foragers_wealth = [remaining / self.num_foragers] * self.num_foragers # <= MUST INCLUDE WAGES
 
     def get_coordinator_wealth(self) -> float:
         assert(self.coordinator_wealth is not None), "Coordinator wealth is not set yet. Run update() first."
@@ -333,7 +382,7 @@ class RewardProcessing:
         experiment: psynet.experiment.Experiment,
         trial_type: str
     ) -> str:
-        trial_types = ["coordinator"] + [f"forager-{i+1}" for i in range(NUM_FORAGERS)]
+        trial_types = ["coordinator"] + [f"forager-{i}" for i in range(NUM_FORAGERS)]
         assert(trial_type in trial_types), f"Invalid trial type: {trial_type}. Expected one of {trial_types}."
 
         accumulated_wealth = experiment.var.accumulated_wealth

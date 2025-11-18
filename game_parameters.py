@@ -1,12 +1,15 @@
 # Module with the game parameters
 
-NUM_FORAGERS = 3
+POWER_ROLE = "coordinator"
+NUM_FORAGERS = 2
+NUM_CENTROIDS = 2
 NUM_COINS = 100
-NUM_ITERATIONS_PER_PLAYER = 3
-LIST_OF_DISTRIBUTIONS = ["linear"]
+LIST_OF_DISTRIBUTIONS = ["linear", "circular"]
 DISPERSION = 10
-MAX_NODES_PER_CHAIN = 2
-
+STARTING_OVERHEAD = 0.5
+STARTING_PREROGATIVE = 0.5
+STARTING_WAGES = 0.5
+INITIAL_WEALTH = 100
 
 IMAGE_PATHS = {
     "img_url": "static/positioning.png",

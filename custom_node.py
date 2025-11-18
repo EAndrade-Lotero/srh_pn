@@ -4,8 +4,19 @@
 ##########################################################################################
 
 from psynet.trial import ChainNode
-from psynet.trial.create_and_rate import CreateAndRateNodeMixin
 from psynet.utils import get_logger
+from psynet.trial.create_and_rate import CreateAndRateNodeMixin
+
+from .helper_classes import (
+    SliderValues,
+    WealthTracker,
+)
+from .game_parameters import (
+    NUM_FORAGERS,
+    NUM_COINS,
+    POWER_ROLE,
+)
+
 
 logger = get_logger()
 
@@ -18,33 +29,21 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_seed(self) -> str:
-        return self.seed
-
     def create_definition_from_seed(self, seed, experiment, participant):
         return seed
 
-    def summarize_trials(self, trials: list, experiment, participant):
-        # import pydevd_pycharm
-        # pydevd_pycharm.settrace('localhost', port=12345, stdout_to_server=True, stderr_to_server=True)
+    def summarize_trials(self, trials: list, experiment, participant) -> None:
+        # Update slider values
+        sliders = SliderValues()
+        sliders.update_from_trials(trials, POWER_ROLE)
 
-        # trial_maker = self.trial_maker
-        # all_rate_trials = trial_maker.rater_class.query.filter_by(
-        #     node_id=self.id, failed=False, finalized=True
-        # ).all()
-        # logger.info(f"All rate trials: {all_rate_trials}")
-        #
-        # rate_mode = trial_maker.rate_mode
-        # logger.info(f"Rate mode: {rate_mode}")
-        #
-        # logger.info("")
-        # logger.info("="*60)
-        # trials_by_type = [type(trial) for trial in trials]
-        # logger.info(f"trials: {trials_by_type}")
-        # logger.info("")
+        # Update wealth using results from players
+        accumulated_wealth = WealthTracker()
+        accumulated_wealth.update(trials, sliders)
 
-        slider = experiment.var.slider
-        accumulated_wealth = experiment.var.accumulated_wealth
-        accumulated_wealth.update(trials, slider)
-        experiment.var.set("accumulated_wealth", accumulated_wealth)
+        # Update records
+        self.seed['overhead'] = sliders.get_overhead()
+        self.seed['prerogative'] = sliders.get_coordinator_prerogative()
+        self.seed['wages'] = sliders.get_wages_commission()
+        self.seed['wealth'] = accumulated_wealth.n_coins
 

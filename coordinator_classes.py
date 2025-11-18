@@ -4,6 +4,7 @@
 # Imports
 ##########################################################################################
 from pathlib import Path
+from markupsafe import Markup
 from typing import Any, Union, List
 
 from psynet.page import  InfoPage
@@ -13,7 +14,10 @@ from psynet.modular_page import (
     Prompt,
     SliderControl,
 )
-from psynet.timeline import FailedValidation
+from psynet.timeline import (
+    PageMaker,
+    FailedValidation
+)
 from psynet.trial.create_and_rate import CreateTrialMixin
 from psynet.trial.imitation_chain import ImitationChainTrial
 
@@ -23,9 +27,6 @@ from .custom_front_end import (
 )
 from .game_parameters import (
     NUM_FORAGERS,
-    NUM_COINS,
-    DISPERSION,
-    IMAGE_PATHS,
 )
 from .helper_classes import (
     World,
@@ -45,15 +46,15 @@ logger = get_logger()
 class InvestingPage(ModularPage):
     def __init__(
             self,
-            distribution: str,
             time_estimate: float,
     ) -> None:
 
-        information_text = '''
-        You have to invest a percentage of your endowment to obtain information about the location of the resources.
+        information_text = Markup("""
+        <h3>Page (2/6)</h3>
+        <p>You have to invest a percentage of your endowment to obtain information about the location of the resources.
         The percentage you invest corresponds to the probability that each coin is shown in your map.
-        Move the slider to determine the percentage of your endowment that you want to invest.
-        '''
+        Move the slider to determine the percentage of your endowment that you want to invest.</p>
+        """)
         super().__init__(
             "Coordinator_information_gathering",
             Prompt(
@@ -66,38 +67,16 @@ class InvestingPage(ModularPage):
                 n_steps=100,
             ),
             time_estimate=time_estimate,
+            save_answer="investment"
         )
-        self.distribution = distribution
 
     def format_answer(self, raw_answer, **kwargs) -> str:
         try:
-            # numbers = re.findall(r"-?\d+", raw_answer)
-            # assert len(numbers) == self.num_foragers
-            # numbers = [int(n) for n in numbers]
-            # logger.info(f"------> numbers input: {numbers}")
-            # return numbers
             investment = float(raw_answer)
             logger.info(f"------> The coordinator invests: {investment*100}%")
-
-            # Create the world visualizing the chosen percentage of coins
-            world = World(
-                num_coins=NUM_COINS,
-                num_centroids=NUM_FORAGERS,
-                distribution=self.distribution,
-                dispersion=DISPERSION,
-            )
-            world.map_path = Path(IMAGE_PATHS["map_url"])
-            world.coin_path = Path(IMAGE_PATHS["coin_url"])
-            world.render(
-                show=False,
-                coin_percentage=investment,
-                coin_zoom=1 / NUM_COINS
-            )
-
-            return "OK"
-
+            return raw_answer
         except (ValueError, AssertionError) as e:
-            logger.info(f"Oooops: {e}")
+            logger.info(f"Error: {e}")
             return f"INVALID_RESPONSE"
 
     def validate(self, response, **kwargs) -> Union[FailedValidation, None]:
@@ -118,44 +97,61 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
         # pydevd_pycharm.settrace('localhost', port=12345, stdout_to_server=True, stderr_to_server=True)
 
         logger.info("Entering the coordinator trial...")
-        distribution = participant.current_trial.node.get_seed()
-        logger.info(f"{distribution} is the seed.")
 
-        slider = experiment.var.slider
-        logger.info(f"Sliders values:\n{slider}")
+        # Extract variables from node
+        if hasattr(self, "origin"):
+            # Extract world
+            world = self.origin.definition['world']
+            world.map_path = Path(self.context["map_url"])
+            world.coin_path = Path(self.context["coin_url"])
+            world.forager_path = Path(self.context["forager_url"])
+            # Extract slider values
+            overhead = self.origin.definition['overhead']
+        else:
+            raise Exception("Error: No world created for this trial.")
 
         list_of_pages = [
             InfoPage(
-                "This is going to be the Instructions page for the COORDINATOR",
+                Markup("""
+                <h3>Page (1/6)</h3>
+                <p>This is going to be the Instructions page for the COORDINATOR</p>
+                """),
                 time_estimate=5
             ),
             InvestingPage(
-                distribution=distribution,
                 time_estimate=self.time_estimate,
             ),
-            ModularPage(
-                "custom_front_end_to_position_foragers",
-                HelloPrompt(
-                    username="Coordinator",
-                    text="Please position all the foragers on the map below."
+            PageMaker(
+                lambda participant: ModularPage(
+                    "custom_front_end_to_position_foragers",
+                    HelloPrompt(
+                        username="Coordinator",
+                        text=Markup(
+                            """
+                            <h3>Page (3/6)</h3>
+                            <p>Please position all the foragers on the map below.</p>
+                            """
+                        )
+                    ),
+                    PositioningControl(
+                        world=world,
+                        investment=participant.vars['investment'],
+                    ),
+                    time_estimate=self.time_estimate,
+                    save_answer="forager_positions"
                 ),
-                PositioningControl(
-                    map_url=self.context["map_url"],
-                    forager_url=self.context["forager_url"],
-                    num_foragers=NUM_FORAGERS,
-                ),
-                time_estimate=self.time_estimate
-            ),
-            InfoPage(
-                RewardProcessing.get_reward_text(experiment, "coordinator"),
-                time_estimate=5
-            ),
-            WellBeingReportPage(
                 time_estimate=self.time_estimate,
             ),
+            # InfoPage(
+            #     RewardProcessing.get_reward_text(experiment, "coordinator"),
+            #     time_estimate=5
+            # ),
+            # WellBeingReportPage(
+            #     time_estimate=self.time_estimate,
+            # ),
             SliderSettingPage(
                 dimension="overhead",
-                experiment=experiment,
+                start_value=overhead,
                 time_estimate=self.time_estimate,
             ),
         ]
