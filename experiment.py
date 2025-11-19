@@ -22,6 +22,7 @@ from .game_parameters import (
     STARTING_PREROGATIVE,
     STARTING_WAGES,
     INITIAL_WEALTH,
+    MAX_NODES_PER_CHAIN,
     IMAGE_PATHS,
 )
 from .helper_classes import World
@@ -85,7 +86,7 @@ trial_maker = CreateAndRateTrialMaker(
     recruit_mode="n_trials",
     target_n_participants=None,
     wait_for_networks=False,
-    max_nodes_per_chain=1,
+    max_nodes_per_chain=MAX_NODES_PER_CHAIN,
 )
 
 class Exp(psynet.experiment.Experiment):

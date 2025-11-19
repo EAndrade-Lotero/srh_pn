@@ -81,7 +81,7 @@ class SliderSettingPage(ModularPage):
         assert(dimension in ['overhead', 'wages-commission', 'prerogative']), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages-commission', 'prerogative'."
 
         super().__init__(
-            "parameter_modification",
+            dimension,
             Prompt(
                 text=information_text,
             ),

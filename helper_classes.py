@@ -52,16 +52,18 @@ class SliderValues:
     def update_from_trials(self, trials: List[Any]) -> None:
         role = POWER_ROLE
         assert(role in ['coordinator'] + [f"forager-{i}" for i in range(NUM_FORAGERS)])
-        trial = [t for t in trials if role in type(t)]
+        trial = [t for t in trials if role in str(t).lower()]
         logger.info(f"Updating {trial}")
-        assert(len(trial) == 1)
+        assert(len(trial) == 1), f"{[str(t) for t in trials]} --- {[str(t) for t in trial]}"
         trial = trial[0]
-        logger.info(f"{trial.origin.definition}")
 
         # parameters =  ["overhead", "prerogative", "wages"]
         parameters =  ["overhead"]
         for parameter in parameters:
-            new_value = trial.vars[parameter]
+            assert(hasattr(trial, "answer"))
+            assert(parameter in trial.answer.keys()), f"{[parameter]} --- {trial.vars} --- {vars(trial)}"
+            new_value = trial.answer[parameter]
+            logger.info(f"Slider: Updating {parameter} = {new_value}")
             if parameter == "prerogative":
                 self.update_coordinator_prerogative(new_value)
             elif parameter == "wages":
@@ -324,10 +326,11 @@ class WealthTracker:
         self.foragers_wealth: Union[List[float], None] = None
 
     def update_from_trials(self, trials: List[Any], slider: SliderValues) -> None:
-        assert len(trials) == self.num_foragers
+        forager_trials = [t for t in trials if 'forager' in str(t).lower()]
+        assert len(forager_trials) == self.num_foragers
 
         # Get forager production in previous episode
-        foragers_payoffs = self.get_coins_from_foragers(trials)
+        foragers_payoffs = self.get_coins_from_foragers(forager_trials)
         self.n_coins = sum(foragers_payoffs)
         foragers_proportions = np.array(foragers_payoffs) / self.n_coins
 
@@ -346,10 +349,12 @@ class WealthTracker:
         self.foragers_wealth = foragers_split + wages
 
     def get_coins_from_foragers(self, trials: List[Any]) -> NDArray[np.float64]:
+        foragers_payoffs = []
         for trial in trials:
-            if 'Forager' in type(trial):
-                answers = self.get_coins(trial)
-                logger.info(f"{str(trial)} => {answers}")
+            answers = self.get_coins(trial)
+            logger.info(f"{str(trial)} => {answers}")
+            foragers_payoffs.append(answers)
+        return np.array(foragers_payoffs)
 
     def get_coins(self, trial: Any) -> int:
         logger.info(f"{hasattr(trial, "vars['coins_foraged']")}")

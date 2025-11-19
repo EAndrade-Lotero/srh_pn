@@ -11,6 +11,10 @@ from .helper_classes import (
     SliderValues,
     WealthTracker,
 )
+from .game_parameters import (
+    POWER_ROLE,
+    NUM_FORAGERS,
+)
 
 logger = get_logger()
 
@@ -27,6 +31,9 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
         return seed
 
     def summarize_trials(self, trials: list, experiment, participant) -> None:
+        # import pydevd_pycharm
+        # pydevd_pycharm.settrace('localhost', port=12345, stdout_to_server=True, stderr_to_server=True)
+
         # Update slider values
         sliders = SliderValues()
         sliders.update_from_trials(trials)
@@ -36,8 +43,10 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
         accumulated_wealth.update_from_trials(trials, sliders)
 
         # Update records
-        self.seed['overhead'] = sliders.get_overhead()
-        self.seed['prerogative'] = sliders.get_coordinator_prerogative()
-        self.seed['wages'] = sliders.get_wages_commission()
-        self.seed['wealth'] = accumulated_wealth.n_coins
+        seed = self.seed.copy()
+        seed['overhead'] = sliders.get_overhead()
+        seed['prerogative'] = sliders.get_coordinator_prerogative()
+        seed['wages'] = sliders.get_wages_commission()
+        seed['wealth'] = accumulated_wealth.n_coins
 
+        return seed
