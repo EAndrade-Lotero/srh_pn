@@ -5,7 +5,9 @@
 ##########################################################################################
 from pathlib import Path
 from markupsafe import Markup
-from typing import Any, Union, List
+from typing import (
+    Any, Union, List,
+)
 
 from psynet.page import  InfoPage
 from psynet.utils import get_logger
@@ -16,7 +18,6 @@ from psynet.modular_page import (
 )
 from psynet.timeline import (
     PageMaker,
-    CodeBlock,
     FailedValidation,
 )
 from psynet.trial.create_and_rate import CreateTrialMixin
@@ -26,20 +27,22 @@ from .custom_front_end import (
     HelloPrompt,
     PositioningControl,
 )
-from .helper_classes import (
-    World,
-    RewardProcessing,
-)
+from .helper_classes import RewardProcessing
 from .custom_pages import (
     WellBeingReportPage,
     SliderSettingPage,
 )
+from .helper_functions import get_world_wealth_slider_from_node
 
 logger = get_logger()
 
 ###########################################
 # Coordinator classes
 ###########################################
+
+
+########################
+# Pages
 
 class InvestingPage(ModularPage):
     def __init__(
@@ -86,6 +89,9 @@ class InvestingPage(ModularPage):
         return None
 
 
+########################
+# Trial
+
 class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
     time_estimate = 5
     accumulate_answers = True
@@ -98,14 +104,12 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
 
         # Extract variables from node
         if hasattr(self, "origin"):
-            # Extract world
-            world = self.origin.definition['world']
+            # Extract world, wealth, slider values
+            world, world_slider, wealth = get_world_wealth_slider_from_node(self.origin)
             world.map_path = Path(self.context["map_url"])
             world.coin_path = Path(self.context["coin_url"])
             world.forager_path = Path(self.context["forager_url"])
-            # Extract slider values
-            overhead = self.origin.definition['overhead']
-            logger.info(f"Overhead: {overhead}")
+            logger.info(f"Overhead: {world_slider.get_overhead()}")
         else:
             raise Exception("Error: No world created for this trial.")
 
@@ -141,30 +145,33 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 ),
                 time_estimate=self.time_estimate,
             ),
-            # InfoPage(
-            #     RewardProcessing.get_reward_text(experiment, "coordinator"),
-            #     time_estimate=5
-            # ),
+            InfoPage(
+                RewardProcessing.get_reward_text(
+                    n_coins=wealth,
+                    slider=world_slider,
+                    trial_type="coordinator"
+                ),
+                time_estimate=5
+            ),
             # WellBeingReportPage(
             #     time_estimate=self.time_estimate,
             # ),
             SliderSettingPage(
                 dimension="overhead",
-                start_value=overhead,
+                start_value=world_slider.get_overhead(),
                 time_estimate=self.time_estimate,
             ),
-            CodeBlock(
-                lambda participant: self.update_slider("overhead", participant)
-            )
+            # SliderSettingPage(
+            #     dimension="wages-commission",
+            #     start_value=world_slider.get_wages_commission(),
+            #     time_estimate=self.time_estimate,
+            # ),
+            # SliderSettingPage(
+            #     dimension="prerogative",
+            #     start_value=world_slider.get_coordinator_prerogative(),
+            #     time_estimate=self.time_estimate,
+            # ),
         ]
         return list_of_pages
-
-    def update_slider(self, dimension:str, participant) -> None:
-        assert(dimension in ["overhead", "prerogative", "wages"])
-        logger.info(f"Updating slider for {dimension}...")
-        new_value = participant.vars[dimension]
-        logger.info(f"New value: {new_value}")
-        self.origin.definition[dimension] = new_value
-        logger.info(f"Attempting to update parameter: {self.origin.definition[dimension]}")
 
 ###########################################

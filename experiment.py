@@ -93,6 +93,10 @@ class Exp(psynet.experiment.Experiment):
     label = "Social roles and hierarchies skeleton experiment"
     initial_recruitment_size = 1
 
+    variables = {
+        'forager_positions': None
+    }
+
     timeline = Timeline(
         trial_maker,
     )

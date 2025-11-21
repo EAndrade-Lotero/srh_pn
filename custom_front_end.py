@@ -13,7 +13,10 @@ from psynet.modular_page import (
 )
 from psynet.utils import get_logger
 
-from .helper_classes import World
+from .helper_classes import (
+    World,
+    ForagerPositions,
+)
 from .game_parameters import NUM_COINS
 
 logger = get_logger()
@@ -68,7 +71,10 @@ class PositioningControl(Control):
         self.num_foragers = world.num_foragers
 
     def format_answer(self, raw_answer, **kwargs):
-        logger.info(f"Foragers positions: {raw_answer}")
-        return raw_answer
+        forager_positions = ForagerPositions()
+        for position in raw_answer.values():
+            forager_positions.add_forager_position(position)
+        logger.info(f"Foragers positions: {forager_positions}")
+        return forager_positions
 
 ###########################################

@@ -1,4 +1,5 @@
 # Module with the game parameters
+import numpy as np
 
 POWER_ROLE = "coordinator"
 NUM_FORAGERS = 2
@@ -19,3 +20,5 @@ IMAGE_PATHS = {
     "coin_url": "static/coin.png",
     "forager_url": "static/forager.png",
 }
+
+RNG = np.random.default_rng(42)

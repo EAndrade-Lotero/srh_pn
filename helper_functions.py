@@ -4,16 +4,34 @@
 # Imports
 ##########################################################################################
 
-from typing import List
+from typing import List, Any, Tuple
 
 import psynet
 from psynet.utils import get_logger
+
+from .helper_classes import (
+    World,
+    SliderValues
+)
 
 logger = get_logger()
 
 ###########################################
 # Helper functions
 ###########################################
+
+def get_world_wealth_slider_from_node(node: Any) -> Tuple[World, SliderValues, int]:
+    # Extract world
+    world = node.definition['world']
+    # Extract wealth
+    wealth = node.definition['wealth']
+    # Extract slider values
+    world_slider = SliderValues()
+    world_slider.update_overhead(node.definition['overhead'])
+    world_slider.update_wages_commission(node.definition['wages'])
+    world_slider.update_coordinator_prerogative(node.definition['prerogative'])
+    # Return values
+    return world, world_slider, wealth
 
 def get_list_participants_ids(
         experiment: psynet.experiment.Experiment, 

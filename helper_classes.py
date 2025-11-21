@@ -7,7 +7,6 @@ from numpy.typing import NDArray
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from typing import List, Tuple, Optional, Iterable, Union, Any
 
-import psynet.experiment
 from psynet.utils import get_logger
 
 logger = get_logger()
@@ -16,6 +15,7 @@ from .game_parameters import (
     NUM_FORAGERS,
     POWER_ROLE,
     INITIAL_WEALTH,
+    RNG,
 )
 
 
@@ -98,6 +98,64 @@ class SliderValues:
         return explanation
 
 
+class ForagerPositions:
+    """Keeps track of forager positions"""
+    forager_positions: List[Tuple[Union[int, float], Union[int, float]]] = []
+    forager_queue: List[Tuple[int, Tuple[Union[int, float], Union[int, float]]]] = []
+    _rng = RNG
+
+    def __init__(self) -> None:
+        self.forager_positions = []
+        self.forager_queue = []
+        self.trial_assignments = dict()
+
+    def add_forager_position(self, position:Tuple[Union[int, float], Union[int, float]]) -> None:
+        assert(isinstance(position, Union[tuple, list])), f"Error: Expected tuple or list but got {type(position)}"
+        assert(len(position) == 2), f"Error: Expected size 2 but got {len(position)}"
+        assert(isinstance(position[0], Union[int, float]))
+        assert(isinstance(position[1], Union[int, float]))
+        position = (float(position[0]), float(position[1]))
+        forager_id = len(self.forager_positions)
+        assert(forager_id <= NUM_FORAGERS)
+        self.forager_positions.append(position)
+        self.forager_queue.append((forager_id, position))
+
+    def get_forager_position(self, trial_id:int) -> Tuple[int, Tuple[float, float]]:
+        logger.info(f"{self.trial_assignments}")
+        if str(trial_id) not in self.trial_assignments.keys():
+            assert(len(self.forager_queue) > 0), f"Error: Trial {trial_id} is attempting to get forager position from empty forager queue."
+            next_id = self.get_next_id()
+            forager_id, position = self.forager_queue[next_id]
+            self.trial_assignments[str(trial_id)] = (forager_id, position)
+        else:
+            forager_id, position = self.trial_assignments[str(trial_id)]
+        return forager_id, position
+
+    def get_next_id(self) -> int:
+        ids_taken = [forager_id for forager_id, _ in self.trial_assignments.values()]
+        all_ids = [forager_id for forager_id, _ in self.forager_queue]
+        available_ids = [forager_id for forager_id in all_ids if forager_id not in ids_taken]
+        return self._rng.choice(available_ids)
+
+    def __str__(self) -> str:
+        print_out = f"Trial assignments:"
+        if len(self.trial_assignments) == 0:
+            print_out += f"None\n"
+        else:
+            print_out += "\n"
+        for trial_id, (forager_id, position) in self.trial_assignments.items():
+            print_out += f"\t{trial_id} -> id:{forager_id} at:{position}\n"
+        ids_taken = [id_ for id_, _ in self.trial_assignments.values()]
+        print_out += f"Positions left: {len(self.forager_queue) - len(ids_taken)}\n"
+        for forager_id, position in self.forager_queue:
+            if forager_id not in ids_taken:
+                print_out += f"\t{forager_id} -> {position}\n"
+        return print_out
+
+    def __len__(self) -> int:
+        return len(self.forager_positions)
+
+
 class World:
     """2D grid world with coins placed according to a distribution.
 
@@ -105,13 +163,11 @@ class World:
     """
     width: Optional[int] = 100
     height: Optional[int] = 100
-    seed: Optional[int] = None
     coin_path: Path = None
     map_path: Path = None
     forager_path = None
     num_foragers: int = NUM_FORAGERS
-    forager_positions: List[Tuple[int, int]] = []
-    forager_queue: List[Tuple[int, Tuple[int, int]]] = []
+    _rng = RNG
 
     def __init__(
         self,
@@ -132,18 +188,8 @@ class World:
             raise ValueError("num_coins must be non-negative.")
         if self.num_coins > self.width * self.height / 10:
             raise ValueError(f"num_coins cannot exceed {int(self.width * self.height / 10)} (but got {self.num_coins})")
-        self._rng = np.random.default_rng(self.seed if self.seed is not None else 42)
         self.grid = np.zeros((self.width, self.height))
         self._place_coins()
-
-    def add_forager_position(self, position:Tuple[int, int]) -> None:
-        forager_id = len(self.forager_positions)
-        self.forager_positions.append(position)
-        self.forager_queue.append((forager_id, position))
-
-    def get_forager_position(self) -> Tuple[int, Tuple[int, int]]:
-        forager_id, position = self.forager_queue.pop(0)
-        return forager_id, position
 
     def coin_positions(self) -> List[Tuple[int, int]]:
         """List of (row, col) positions where coins are present."""
@@ -319,8 +365,8 @@ class World:
 class WealthTracker:
     """Keeps track of the coins throughout iterations"""
 
-    def __init__(self) -> None:
-        self.n_coins: int = INITIAL_WEALTH
+    def __init__(self, n_coins:Optional[int]=INITIAL_WEALTH) -> None:
+        self.n_coins = n_coins
         self.num_foragers: int = NUM_FORAGERS
         self.coordinator_wealth: Union[float, None] = None
         self.foragers_wealth: Union[List[float], None] = None
@@ -386,14 +432,16 @@ class RewardProcessing:
 
     @staticmethod
     def get_reward_text(
-        experiment: psynet.experiment.Experiment,
+        n_coins: int,
+        slider: Any,
         trial_type: str
     ) -> str:
         trial_types = ["coordinator"] + [f"forager-{i}" for i in range(NUM_FORAGERS)]
-        assert(trial_type in trial_types), f"Invalid trial type: {trial_type}. Expected one of {trial_types}."
+        assert(trial_type in trial_types), f"Invalid trial type. Expected one of {trial_types} but got {trial_type}."
 
-        accumulated_wealth = experiment.var.accumulated_wealth
-        n_coins = accumulated_wealth.n_coins
+        # Get
+        accumulated_wealth = WealthTracker(n_coins)
+        accumulated_wealth.initialize(slider)
 
         if trial_type == "coordinator":
             wealth = accumulated_wealth.get_coordinator_wealth()
@@ -407,4 +455,3 @@ class RewardProcessing:
         reward_text = f"The total number of coins collected on the previous iteration is {n_coins}.\n\n"
         reward_text += f"Based on the existing contract, you received {wealth} coins.\n\n"
         return reward_text
-

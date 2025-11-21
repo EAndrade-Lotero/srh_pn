@@ -78,7 +78,7 @@ class SliderSettingPage(ModularPage):
         {SliderValues.dimension_explanation(dimension)}.
         The slider below displays the current level of {dimension}. Please move it to match your desired level of {dimension}.
         '''
-        assert(dimension in ['overhead', 'wages-commission', 'prerogative']), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages-commission', 'prerogative'."
+        assert(dimension in ["overhead", "wages-commission", "prerogative"]), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages-commission', 'prerogative'."
 
         super().__init__(
             dimension,
